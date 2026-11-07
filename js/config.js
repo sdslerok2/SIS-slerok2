@@ -5,7 +5,7 @@
  */
 window.APP_CONFIG = {
   // Supabase → Project Settings → Data API → Project URL
-  SUPABASE_URL: 'https://ynmpciortikpnxfodyoq.supabase.co/rest/v1/',
+  SUPABASE_URL: 'https://ynmpciortikpnxfodyoq.supabase.co',
   // Supabase → Project Settings → API Keys → anon public (atau Publishable key sb_publishable_...)
   SUPABASE_ANON_KEY: 'sb_publishable_gJ3H83NRDkYWGjy2x3Vceg_vHgo0NUQ',
   // Apps Script → Terapkan → Kelola deployment → URL aplikasi web (berakhiran /exec)
