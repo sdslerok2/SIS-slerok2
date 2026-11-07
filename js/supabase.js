@@ -10,7 +10,8 @@
 (function (window) {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const URL0 = String(CFG.SUPABASE_URL || '').replace(/\/+$/, '');
+  // Toleran terhadap salah tempel: buang spasi, garis miring di akhir, dan akhiran /rest/v1 atau /auth/v1
+  const URL0 = String(CFG.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/(rest|auth)\/v1$/, '').replace(/\/+$/, '');
   const KEY = CFG.SUPABASE_ANON_KEY || '';
   const SIAP = !!(URL0 && KEY && CFG.GAS_URL);
   const PUBLIK = ['apiLogin', 'apiLogout', 'apiPublik', 'apiVerifikasi', 'apiLupaSandi', 'apiKirimPesan'];
@@ -33,10 +34,22 @@
     const u = String(username || '').trim().toLowerCase().replace(/@/g, '.at.').replace(/[^a-z0-9._+-]/g, '-');
     return u + '@' + (CFG.AUTH_DOMAIN || 'akun.sdnslerok2.id');
   }
+  /** Ubah pesan teknis Supabase menjadi penjelasan yang bisa ditindaklanjuti (null = bukan masalah konfigurasi). */
+  function masalahKonfigurasi(status, pesan) {
+    const m = String(pesan || '');
+    if (/secret API key|service_role/i.test(m)) return 'SUPABASE_ANON_KEY di js/config.js berisi kunci RAHASIA (service_role/secret). Ganti dengan anon public / Publishable key, lalu buat ulang secret key di Supabase.';
+    if (/Invalid API key|No API key|apikey|Unregistered API key|JWS|JWT|signature/i.test(m) || (status === 401 && !/credential/i.test(m))) return 'SUPABASE_ANON_KEY di js/config.js salah atau bukan dari project ini. Salin ulang dari Supabase → Project Settings → API Keys (anon public / Publishable key).';
+    if (/Email logins are disabled|email.*disabled|provider is not enabled/i.test(m)) return 'Login email dimatikan di Supabase. Buka Authentication → Sign In / Providers → Email → aktifkan (Enable), lalu Save.';
+    if (status === 404) return 'SUPABASE_URL di js/config.js salah. Isi dengan Project URL (https://xxxx.supabase.co) dari Project Settings → Data API.';
+    if (/function .* does not exist|Could not find the function|PGRST202/i.test(m)) return 'Fungsi database belum ada. Jalankan ulang SETUP_SUPABASE.sql di Supabase SQL Editor sampai muncul ✅ SETUP SELESAI.';
+    return null;
+  }
   async function authFetch(path, body, token) {
     const h = { apikey: KEY, 'Content-Type': 'application/json' };
     if (token) h.Authorization = 'Bearer ' + token;
-    const res = await fetch(URL0 + '/auth/v1/' + path, { method: 'POST', headers: h, body: JSON.stringify(body || {}) });
+    let res;
+    try { res = await fetch(URL0 + '/auth/v1/' + path, { method: 'POST', headers: h, body: JSON.stringify(body || {}) }); }
+    catch (e) { return { ok: false, status: 0, json: { message: 'jaringan' } }; }
     const t = await res.text(); let j = {}; try { j = t ? JSON.parse(t) : {}; } catch (e) { }
     return { ok: res.ok, status: res.status, json: j };
   }
@@ -70,7 +83,7 @@
     const res = await fetch(URL0 + '/rest/v1/' + path, { method: opsi.method || 'GET', headers: h, body: opsi.body === undefined ? undefined : JSON.stringify(opsi.body) });
     const txt = await res.text();
     if (res.status === 401 && !opsi.anon) { simpanSesi(null); throw new SesiHabis('Sesi berakhir.'); }
-    if (!res.ok) { let m = txt; try { const j = JSON.parse(txt); m = j.message || m; } catch (e) { } throw new Error(/permission denied|42501/.test(m) ? 'Akses ditolak.' : 'Database: ' + m); }
+    if (!res.ok) { let m = txt; try { const j = JSON.parse(txt); m = j.message || j.msg || m; } catch (e) { } if (/permission denied|42501/.test(m)) throw new Error('Akses ditolak.'); throw new Error(masalahKonfigurasi(res.status, m) || 'Database: ' + m); }
     return { json: txt ? JSON.parse(txt) : null, range: res.headers.get('Content-Range') || '' };
   }
   const rpc = (fn, args, anon) => rest('rpc/' + fn, { method: 'POST', body: args || {}, anon: anon }).then(r => r.json);
@@ -196,6 +209,9 @@
       const m = String(r.json.error_description || r.json.msg || r.json.message || '');
       if (r.status === 429 || /rate|too many/i.test(m)) return fail('Terlalu banyak percobaan. Coba lagi beberapa menit lagi.');
       if (/banned/i.test(m + (r.json.error || '') + (r.json.error_code || ''))) return fail('Akun dinonaktifkan. Hubungi operator sekolah.');
+      if (r.status === 0) return fail('Tidak dapat terhubung ke Supabase. Periksa internet dan SUPABASE_URL di js/config.js (harus https://xxxx.supabase.co).');
+      const k = masalahKonfigurasi(r.status, m + ' ' + (r.json.error_code || '') + ' ' + (r.json.error || ''));
+      if (k) return fail(k);
       return fail('Username atau kata sandi salah.');
     }
     simpanSesi(simpanBentuk(r.json));
@@ -233,7 +249,7 @@
       return r;
     } catch (e) {
       if (e instanceof SesiHabis) return fail(e.message === 'Sesi berakhir.' ? 'Sesi berakhir. Silakan masuk kembali.' : e.message, { sesi: true });
-      if (e instanceof TypeError) return fail('Koneksi ke database terputus. Periksa internet Anda.', { jaringan: true });
+      if (e instanceof TypeError) return fail(fn === 'apiPublik' ? 'Tidak dapat terhubung ke Supabase. Periksa internet dan SUPABASE_URL di js/config.js.' : 'Koneksi ke database terputus. Periksa internet Anda.', { jaringan: fn !== 'apiPublik' });
       return fail(e.message || String(e));
     }
   }

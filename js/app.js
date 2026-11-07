@@ -2002,7 +2002,15 @@ async function muatPublik(rerender) {
   try {
     const r = await api('apiPublik');
     if (r.success) { const lama = JSON.stringify(S.pub); S.pub = r.data; store.set('pub', r.data); if (rerender && VIEW[S.view] && VIEW[S.view].layout === 'pub' && lama !== JSON.stringify(r.data) && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) renderUlang(); }
-  } catch (e) { if (!S.pub) toast('Gagal memuat data website: ' + e.message, 'err'); }
+    else gagalPublik(r.message);
+  } catch (e) { gagalPublik(e.message); }
+}
+/** Data website gagal dimuat: jangan biarkan beranda berputar terus — tampilkan penyebab + tombol coba lagi. */
+function gagalPublik(pesan) {
+  if (S.pub) return;
+  const el = $('#pubMain'); if (!el || !VIEW[S.view] || VIEW[S.view].layout !== 'pub') return;
+  el.innerHTML = '<div class="wrap sec"><div class="alert alert-err" role="alert" style="align-items:flex-start">' + ic('triangle-alert') + '<div><b>Data website gagal dimuat.</b><div class="mt8">' + esc(pesan || 'Penyebab tidak diketahui.') + '</div><button class="btn btn-secondary btn-sm mt16" id="pubUlang">' + ic('refresh-cw') + 'Coba Lagi</button></div></div></div>';
+  ikon(); $('#pubUlang').onclick = () => { renderUlang(); muatPublik(true); };
 }
 function bacaParamUrl() {
   try { const p = new URLSearchParams(location.search), o = {}; p.forEach((v, k) => { o[k] = v; }); return Promise.resolve(o); } catch (e) { return Promise.resolve({}); }
@@ -2033,5 +2041,5 @@ function bacaParamUrl() {
   }
   buka('beranda', {}, { tanpaRiwayat: true });
   await muatPublik(true);
-  if (S.view === 'beranda') renderUlang();
+  if (S.view === 'beranda' && S.pub) renderUlang();
 })();
