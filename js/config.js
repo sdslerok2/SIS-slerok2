@@ -11,7 +11,7 @@ window.APP_CONFIG = {
   // Apps Script → Terapkan → Kelola deployment → URL aplikasi web (berakhiran /exec)
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxRR6H0GaQVBSxXfKGn7FCzu0BnW2Uz0Xz6qVNLIT9vp3nV1Iukz5_yGpoRnrqFAazw/exec',
   // Alamat website ini setelah dipasang (untuk QR verifikasi), mis. https://namaanda.github.io/sis-slerok2/
-  APP_URL: 'https://github.com/sdslerok2/SIS-slerok2/settings/pages',
+  APP_URL: 'https://sdslerok2.github.io/SIS-slerok2/',
   // Jangan diubah — harus sama dengan AUTH_DOMAIN di Supabase.gs
   AUTH_DOMAIN: 'akun.sdnslerok2.id'
 };
